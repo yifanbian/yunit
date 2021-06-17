@@ -1,10 +1,10 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Globalization;
 using System.IO;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
@@ -13,16 +13,20 @@ namespace Yunit
 {
     internal partial class YamlUtility
     {
-        internal static JToken ToJToken(
-            string input, Action<Scalar> onKeyDuplicate = null, Func<JToken, ParsingEvent, JToken> onConvert = null)
+        internal static JsonNode ToJsonNode(
+            string input,
+            Action<Scalar> onKeyDuplicate = null,
+            Func<JsonNode, ParsingEvent, JsonNode> onConvert = null)
         {
-            return ToJToken(new StringReader(input), onKeyDuplicate, onConvert);
+            return ToJsonNode(new StringReader(input), onKeyDuplicate, onConvert);
         }
 
-        internal static JToken ToJToken(
-            TextReader input, Action<Scalar> onKeyDuplicate = null, Func<JToken, ParsingEvent, JToken> onConvert = null)
+        internal static JsonNode ToJsonNode(
+            TextReader input,
+            Action<Scalar> onKeyDuplicate = null,
+            Func<JsonNode, ParsingEvent, JsonNode> onConvert = null)
         {
-            JToken result = null;
+            JsonNode result = null;
 
             onKeyDuplicate ??= (_ => { });
             onConvert ??= ((token, _) => token);
@@ -32,39 +36,41 @@ namespace Yunit
             if (!parser.TryConsume<StreamEnd>(out var _))
             {
                 parser.Consume<DocumentStart>();
-                result = ToJToken(parser, onKeyDuplicate, onConvert);
+                result = ToJsonNode(parser, onKeyDuplicate, onConvert);
                 parser.Consume<DocumentEnd>();
             }
 
             return result;
         }
 
-        private static JToken ToJToken(
-            IParser parser, Action<Scalar> onKeyDuplicate, Func<JToken, ParsingEvent, JToken> onConvert)
+        private static JsonNode ToJsonNode(
+            IParser parser,
+            Action<Scalar> onKeyDuplicate,
+            Func<JsonNode, ParsingEvent, JsonNode> onConvert)
         {
             switch (parser.Consume<NodeEvent>())
             {
                 case Scalar scalar:
                     if (scalar.Style == ScalarStyle.Plain)
                     {
-                        return onConvert(ParseScalar(scalar.Value), scalar);
+                        return onConvert(ParseScalarAsJsonNode(scalar.Value), scalar);
                     }
-                    return onConvert(new JValue(scalar.Value), scalar);
+                    return onConvert(JsonValue.Create(scalar.Value), scalar);
 
                 case SequenceStart seq:
-                    var array = new JArray();
+                    var array = new JsonArray();
                     while (!parser.TryConsume<SequenceEnd>(out var _))
                     {
-                        array.Add(ToJToken(parser, onKeyDuplicate, onConvert));
+                        array.Add(ToJsonNode(parser, onKeyDuplicate, onConvert));
                     }
                     return onConvert(array, seq);
 
                 case MappingStart map:
-                    var obj = new JObject();
+                    var obj = new JsonObject();
                     while (!parser.TryConsume<MappingEnd>(out var _))
                     {
                         var key = parser.Consume<Scalar>();
-                        var value = ToJToken(parser, onKeyDuplicate, onConvert);
+                        var value = ToJsonNode(parser, onKeyDuplicate, onConvert);
 
                         if (obj.ContainsKey(key.Value))
                         {
@@ -72,7 +78,7 @@ namespace Yunit
                         }
 
                         obj[key.Value] = value;
-                        onConvert(obj.Property(key.Value), key);
+                        onConvert(obj[key.Value], key);
                     }
                     return onConvert(obj, map);
 
@@ -81,7 +87,7 @@ namespace Yunit
             }
         }
 
-        private static JToken ParseScalar(string value)
+        private static JsonNode ParseScalarAsJsonNode(string value)
         {
             // https://yaml.org/spec/1.2/2009-07-21/spec.html
             //
@@ -99,34 +105,34 @@ namespace Yunit
             //    *                                               tag:yaml.org,2002:str(Default)
             if (string.IsNullOrEmpty(value) || value == "~" || value.Equals("null", StringComparison.OrdinalIgnoreCase))
             {
-                return JValue.CreateNull();
+                return JsonValue.Create<object>(null);
             }
             if (bool.TryParse(value, out var b))
             {
-                return new JValue(b);
+                return JsonValue.Create(b);
             }
             if (long.TryParse(value, out var l))
             {
-                return new JValue(l);
+                return JsonValue.Create(l);
             }
             if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) &&
                 !double.IsNaN(d) && !double.IsPositiveInfinity(d) && !double.IsNegativeInfinity(d))
             {
-                return new JValue(d);
+                return JsonValue.Create(d);
             }
             if (value.Equals(".nan", StringComparison.OrdinalIgnoreCase))
             {
-                return new JValue(double.NaN);
+                return JsonValue.Create(double.NaN);
             }
             if (value.Equals(".inf", StringComparison.OrdinalIgnoreCase) || value.Equals("+.inf", StringComparison.OrdinalIgnoreCase))
             {
-                return new JValue(double.PositiveInfinity);
+                return JsonValue.Create(double.PositiveInfinity);
             }
             if (value.Equals("-.inf", StringComparison.OrdinalIgnoreCase))
             {
-                return new JValue(double.NegativeInfinity);
+                return JsonValue.Create(double.NegativeInfinity);
             }
-            return new JValue(value);
+            return JsonValue.Create(value);
         }
     }
 }

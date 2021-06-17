@@ -2,16 +2,24 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Yunit
 {
     public static class JsonDiffExtensions
     {
+        private static readonly JsonSerializerOptions s_serializerOptions = new()
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            WriteIndented = true,
+        };
+
         /// <summary>
         /// Ignore the actual result of a property if the expected value is null
         /// </summary>
@@ -23,8 +31,12 @@ namespace Yunit
             if (builder is null)
                 throw new ArgumentNullException(nameof(builder));
 
-            return builder.Use(predicate, (expected, actual, name, diff) =>
-                expected.Type == JTokenType.Null && actual.Type != JTokenType.Undefined ? (expected, expected) : (expected, actual));
+            return builder.Use(
+                predicate,
+                (expected, actual, name, diff) =>
+                    expected.GetType() == typeof(object) &&
+                    expected.GetValue<object>() == null &&
+                    actual != null ? (expected, expected) : (expected, actual));
         }
 
         /// <summary>
@@ -40,10 +52,10 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected.Type == JTokenType.String && actual.Type == JTokenType.String &&
-                    expected.Value<string>() is string str && str.StartsWith("!"))
+                if (expected.GetType() == typeof(string) && actual.GetType() == typeof(string) &&
+                    expected.AsValue().TryGetValue<string>(out var str) && str.StartsWith("!"))
                 {
-                    if (str.Substring(1) != actual.Value<string>())
+                    if (str.Substring(1) != actual.GetValue<string>())
                     {
                         return (actual, actual);
                     }
@@ -65,12 +77,12 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected.Type == JTokenType.String && actual.Type == JTokenType.String &&
-                    expected.Value<string>() is string str &&
+                if (expected.GetType() == typeof(string) && actual.GetType() == typeof(string) &&
+                    expected.GetValue<string>() is string str &&
                     str.Length > 2 && str.StartsWith("/") && str.EndsWith("/"))
                 {
                     var regex = str.Substring(1, str.Length - 2);
-                    if (Regex.IsMatch(actual.Value<string>(), regex))
+                    if (Regex.IsMatch(actual.GetValue<string>(), regex))
                     {
                         return (actual, actual);
                     }
@@ -92,10 +104,10 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected.Type == JTokenType.String && actual.Type == JTokenType.String &&
-                    expected.Value<string>() is string str && str.Contains('*'))
+                if (expected.GetType() == typeof(string) && actual.GetType() == typeof(string) &&
+                    expected.GetValue<string>() is string str && str.Contains('*'))
                 {
-                    if (Regex.IsMatch(actual.ToString(), $"^{Regex.Escape(str).Replace("\\*", ".*")}$"))
+                    if (Regex.IsMatch(actual.GetValue<string>(), $"^{Regex.Escape(str).Replace("\\*", ".*")}$"))
                     {
                         return (actual, actual);
                     }
@@ -118,22 +130,22 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected is JObject expectedObj && actual is JObject actualObj)
+                if (expected is JsonObject expectedObj && actual is JsonObject actualObj)
                 {
-                    var newActual = new JObject(actualObj.Properties().Where(IsRequiredProperty));
+                    var newActual = new JsonObject(actualObj.Where(IsRequiredProperty));
 
                     return (expected, newActual);
                 }
 
                 return (expected, actual);
 
-                bool IsRequiredProperty(JProperty property)
+                bool IsRequiredProperty(KeyValuePair<string, JsonNode> property)
                 {
-                    if (expectedObj.ContainsKey(property.Name))
+                    if (expectedObj.ContainsKey(property.Key))
                     {
                         return true;
                     }
-                    if (isRequiredProperty != null && isRequiredProperty(property.Name))
+                    if (isRequiredProperty != null && isRequiredProperty(property.Key))
                     {
                         return true;
                     }
@@ -155,14 +167,14 @@ namespace Yunit
 
             return builder.Use(predicate ?? IsFile(".json"), (expected, actual, name, diff) =>
             {
-                if (expected is JValue ev && ev.Value is string expectedText &&
-                    actual is JValue av && av.Value is string actualText)
+                if (expected is JsonValue ev && ev.TryGetValue<string>(out var expectedText) &&
+                    actual is JsonValue av && av.TryGetValue<string>(out var actualText))
                 {
                     var (expectedNorm, actualNorm) = (jsonDiff ?? diff).Normalize(
-                        JToken.Parse(expectedText),
-                        JToken.Parse(actualText));
+                        JsonNode.Parse(expectedText),
+                        JsonNode.Parse(actualText));
 
-                    return (expectedNorm.ToString(Formatting.Indented), actualNorm.ToString(Formatting.Indented));
+                    return (expectedNorm.ToJsonString(s_serializerOptions), actualNorm.ToJsonString(s_serializerOptions));
                 }
 
                 return (expected, actual);
@@ -182,8 +194,8 @@ namespace Yunit
 
             return builder.Use(predicate ?? IsFile(".html", ".htm"), (expected, actual, name, diff) =>
             {
-                if (expected is JValue ev && ev.Value is string expectedText &&
-                    actual is JValue av && av.Value is string actualText)
+                if (expected is JsonValue ev && ev.TryGetValue<string>(out var expectedText) &&
+                    actual is JsonValue av && av.TryGetValue<string>(out var actualText))
                 {
                     return (JsonDiff.NormalizeHtml(expectedText), JsonDiff.NormalizeHtml(actualText));
                 }

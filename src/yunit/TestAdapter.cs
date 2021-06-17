@@ -16,7 +16,6 @@ using GlobExpressions;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
-using Newtonsoft.Json;
 
 namespace Yunit
 {
@@ -34,8 +33,6 @@ namespace Yunit
         private static readonly object s_lock = new object();
 
         private static readonly Lazy<string> s_repositoryRoot = new Lazy<string>(FindRepositoryPath);
-
-        private static readonly JsonSerializer s_jsonSerializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
 
         private static readonly ConcurrentDictionary<(string, string), (Type, MethodInfo)> s_methodInfo
                           = new ConcurrentDictionary<(string, string), (Type, MethodInfo)>();
@@ -306,7 +303,7 @@ namespace Yunit
             {
                 args[i] = parameters[i].ParameterType == typeof(TestData)
                     ? data
-                    : YamlUtility.ToJToken(data.Content).ToObject(parameters[i].ParameterType, s_jsonSerializer);
+                    : YamlUtility.ToJsonNode(data.Content).ToObject(parameters[i].ParameterType);
             }
 
             try

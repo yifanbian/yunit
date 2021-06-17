@@ -5,13 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
 using HtmlAgilityPack;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Yunit
 {
@@ -20,10 +21,10 @@ namespace Yunit
     /// </summary>
     public class JsonDiff
     {
-        private static readonly JsonSerializer s_serializer = new JsonSerializer
+        private static readonly JsonSerializerOptions s_serializerOptions = new()
         {
-            NullValueHandling = NullValueHandling.Ignore,
-            DateParseHandling = DateParseHandling.None,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            WriteIndented = true,
         };
 
         private readonly JsonDiffNormalize[] _rules = Array.Empty<JsonDiffNormalize>();
@@ -56,8 +57,8 @@ namespace Yunit
         /// </returns>
         public string Diff(object expected, object actual)
         {
-            var expectedJson = ToJToken(expected);
-            var actualJson = ToJToken(actual);
+            var expectedJson = ToJsonNode(expected);
+            var actualJson = ToJsonNode(actual);
 
             var (expectedNorm, actualNorm) = Normalize(expectedJson, actualJson);
             var expectedText = Prettify(expectedNorm);
@@ -93,10 +94,10 @@ namespace Yunit
         }
 
         /// <summary>
-        /// Normalizes the expected <see cref="JToken"/> and actual <see cref="JToken"/>
+        /// Normalizes the expected <see cref="JsonNode"/> and actual <see cref="JsonNode"/>
         /// before performing a text diff, using the rules configured in this <see cref="JsonDiff"/> object.
         /// </summary>
-        public (JToken, JToken) Normalize(JToken expected, JToken actual)
+        public (JsonNode, JsonNode) Normalize(JsonNode expected, JsonNode actual)
         {
             return NormalizeCore(expected, actual, "");
         }
@@ -114,44 +115,44 @@ namespace Yunit
             return sb.ToString().Trim();
         }
 
-        private (JToken, JToken) NormalizeCore(JToken expected, JToken actual, string name)
+        private (JsonNode, JsonNode) NormalizeCore(JsonNode expected, JsonNode actual, string name)
         {
             ApplyRules(ref expected, ref actual, name);
 
             switch (expected)
             {
-                case JObject expectedObj when actual is JObject actualObj:
-                    var expectedProps = new List<JProperty>(expectedObj.Count);
-                    var actualProps = new List<JProperty>(actualObj.Count);
+                case JsonObject expectedObj when actual is JsonObject actualObj:
+                    var expectedProps = new Dictionary<string, JsonNode>(expectedObj.Count);
+                    var actualProps = new Dictionary<string, JsonNode>(actualObj.Count);
 
                     foreach (var prop in expectedObj)
                     {
-                        var actualValue = actualObj.GetValue(prop.Key) ?? JValue.CreateUndefined();
+                        var actualValue = actualObj[prop.Key] ?? null;
                         var (expectedProp, actualProp) = NormalizeCore(prop.Value, actualValue, prop.Key);
 
-                        if (expectedProp.Type != JTokenType.Undefined)
+                        if (expectedProp != null)
                         {
-                            expectedProps.Add(new JProperty(prop.Key, expectedProp));
+                            expectedProps.Add(prop.Key, expectedProp);
                         }
-                        if (actualProp.Type != JTokenType.Undefined)
+                        if (actualProp != null)
                         {
-                            actualProps.Add(new JProperty(prop.Key, actualProp));
+                            actualProps.Add(prop.Key, actualProp);
                         }
                     }
 
-                    foreach (var additionalProperty in actualObj.Properties())
+                    foreach (var additionalProperty in actualObj.AsEnumerable())
                     {
-                        if (!expectedObj.TryGetValue(additionalProperty.Name, out _))
+                        if (!expectedObj.ContainsKey(additionalProperty.Key))
                         {
-                            actualProps.Add(additionalProperty);
+                            actualProps.Add(additionalProperty.Key, additionalProperty.Value);
                         }
                     }
 
-                    return (new JObject(expectedProps), new JObject(actualProps));
+                    return (new JsonObject(expectedProps), new JsonObject(actualProps));
 
-                case JArray expectedArray when actual is JArray actualArray:
-                    var expectedArrayResult = new JArray(expectedArray);
-                    var actualArrayResult = new JArray(actualArray);
+                case JsonArray expectedArray when actual is JsonArray actualArray:
+                    var expectedArrayResult = new JsonArray(expectedArray);
+                    var actualArrayResult = new JsonArray(actualArray);
                     var length = Math.Min(expectedArray.Count, actualArray.Count);
 
                     for (var i = 0; i < length; i++)
@@ -168,7 +169,7 @@ namespace Yunit
             }
         }
 
-        private void ApplyRules(ref JToken expected, ref JToken actual, string name)
+        private void ApplyRules(ref JsonNode expected, ref JsonNode actual, string name)
         {
             foreach (var rule in _rules)
             {
@@ -176,26 +177,26 @@ namespace Yunit
             }
         }
 
-        private static string Prettify(JToken token)
+        private static string Prettify(JsonNode token)
         {
-            return token.ToString(Formatting.Indented)
+            return token.ToJsonString(s_serializerOptions)
                         .Replace(@"\r", "")
                         .Replace(@"\n", "\n")
                         .Replace("{}", "{\n}");
         }
 
-        private static JToken ToJToken(object obj)
+        private static JsonNode ToJsonNode(object obj)
         {
             switch (obj)
             {
                 case null:
-                    return JValue.CreateNull();
+                    return JsonValue.Create<object>(null);
 
-                case JToken token:
+                case JsonNode token:
                     return token;
 
                 default:
-                    return JToken.FromObject(obj, s_serializer);
+                    return JsonNode.Parse(JsonSerializer.Serialize(obj, s_serializerOptions));
             }
         }
 
