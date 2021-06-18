@@ -132,11 +132,11 @@ namespace Yunit
 
                         if (expectedProp != null)
                         {
-                            expectedProps.Add(prop.Key, expectedProp);
+                            expectedProps.Add(prop.Key, expectedProp.Clone());
                         }
                         if (actualProp != null)
                         {
-                            actualProps.Add(prop.Key, actualProp);
+                            actualProps.Add(prop.Key, actualProp.Clone());
                         }
                     }
 
@@ -144,15 +144,15 @@ namespace Yunit
                     {
                         if (!expectedObj.ContainsKey(additionalProperty.Key))
                         {
-                            actualProps.Add(additionalProperty.Key, additionalProperty.Value);
+                            actualProps.Add(additionalProperty.Key, additionalProperty.Value.Clone());
                         }
                     }
 
                     return (new JsonObject(expectedProps), new JsonObject(actualProps));
 
                 case JsonArray expectedArray when actual is JsonArray actualArray:
-                    var expectedArrayResult = new JsonArray(expectedArray);
-                    var actualArrayResult = new JsonArray(actualArray);
+                    var expectedArrayResult = expectedArray.Clone();
+                    var actualArrayResult = actualArray.Clone();
                     var length = Math.Min(expectedArray.Count, actualArray.Count);
 
                     for (var i = 0; i < length; i++)

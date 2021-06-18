@@ -132,7 +132,12 @@ namespace Yunit
             {
                 if (expected is JsonObject expectedObj && actual is JsonObject actualObj)
                 {
-                    var newActual = new JsonObject(actualObj.Where(IsRequiredProperty));
+                    var newActual = actualObj.Clone();
+                    var unnecessaryKeys = actualObj.Where(x => !IsRequiredProperty(x)).Select(x => x.Key).ToArray();
+                    foreach (var key in unnecessaryKeys)
+                    {
+                        newActual.Remove(key);
+                    }
 
                     return (expected, newActual);
                 }
