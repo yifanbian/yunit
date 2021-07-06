@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+﻿// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
@@ -34,9 +34,8 @@ namespace Yunit
             return builder.Use(
                 predicate,
                 (expected, actual, name, diff) =>
-                    expected.GetType() == typeof(object) &&
-                    expected.GetValue<object>() == null &&
-                    actual != null ? (expected, expected) : (expected, actual));
+                    expected == null && actual != null
+                    ? (expected, expected) : (expected, actual));
         }
 
         /// <summary>
@@ -52,8 +51,8 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected.GetType() == typeof(string) && actual.GetType() == typeof(string) &&
-                    expected.AsValue().TryGetValue<string>(out var str) && str.StartsWith("!"))
+                if (expected is JsonValue expectedValue && actual is JsonValue actualValue &&
+                    expectedValue.TryGetValue<string>(out var str) && str.StartsWith("!"))
                 {
                     if (str.Substring(1) != actual.GetValue<string>())
                     {
@@ -77,8 +76,8 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected.GetType() == typeof(string) && actual.GetType() == typeof(string) &&
-                    expected.GetValue<string>() is string str &&
+                if (expected is JsonValue expectedValue && actual is JsonValue actualValue &&
+                    expectedValue.TryGetValue<string>(out var str) &&
                     str.Length > 2 && str.StartsWith("/") && str.EndsWith("/"))
                 {
                     var regex = str.Substring(1, str.Length - 2);
@@ -104,8 +103,8 @@ namespace Yunit
 
             return builder.Use(predicate, (expected, actual, name, diff) =>
             {
-                if (expected.GetType() == typeof(string) && actual.GetType() == typeof(string) &&
-                    expected.GetValue<string>() is string str && str.Contains('*'))
+                if (expected is JsonValue expectedValue && actual is JsonValue actualValue &&
+                    expectedValue.TryGetValue<string>(out var str) && str.Contains('*'))
                 {
                     if (Regex.IsMatch(actual.GetValue<string>(), $"^{Regex.Escape(str).Replace("\\*", ".*")}$"))
                     {

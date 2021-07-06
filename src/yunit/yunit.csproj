@@ -19,15 +19,15 @@
   <ItemGroup>
     <PackageReference Include="DiffPlex" Version="1.7.0" />
     <PackageReference Include="Glob" Version="1.1.8" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.11.33" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
-    <PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="16.9.4" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.34" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.10.0" />
+    <PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="16.10.0" />
     <PackageReference Include="System.Text.Json" Version="6.0.0-preview.5.21301.5" />
-    <PackageReference Include="YamlDotNet" Version="11.1.1" />
+    <PackageReference Include="YamlDotNet" Version="11.2.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Nerdbank.GitVersioning" Version="3.4.194" PrivateAssets="all" />
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.4.220" PrivateAssets="all" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
   </ItemGroup>
 

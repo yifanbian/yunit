@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+﻿// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
@@ -127,16 +127,23 @@ namespace Yunit
 
                     foreach (var prop in expectedObj)
                     {
-                        var actualValue = actualObj[prop.Key] ?? null;
-                        var (expectedProp, actualProp) = NormalizeCore(prop.Value, actualValue, prop.Key);
+                        if (actualObj.ContainsKey(prop.Key))
+                        {
+                            var actualValue = actualObj[prop.Key];
+                            var (expectedProp, actualProp) = NormalizeCore(prop.Value, actualValue, prop.Key);
 
-                        if (expectedProp != null)
-                        {
-                            expectedProps.Add(prop.Key, expectedProp.Clone());
+                            if (expectedProp != null)
+                            {
+                                expectedProps.Add(prop.Key, expectedProp.Clone());
+                            }
+                            if (actualProp != null)
+                            {
+                                actualProps.Add(prop.Key, actualProp.Clone());
+                            }
                         }
-                        if (actualProp != null)
+                        else
                         {
-                            actualProps.Add(prop.Key, actualProp.Clone());
+                            expectedProps.Add(prop.Key, prop.Value.Clone());
                         }
                     }
 
@@ -159,8 +166,8 @@ namespace Yunit
                     {
                         var (expectedNorm, actualNorm) = NormalizeCore(expectedArray[i], actualArray[i], "");
 
-                        expectedArrayResult[i] = expectedNorm;
-                        actualArrayResult[i] = actualNorm;
+                        expectedArrayResult[i] = expectedNorm.Clone();
+                        actualArrayResult[i] = actualNorm.Clone();
                     }
                     return (expectedArrayResult, actualArrayResult);
 

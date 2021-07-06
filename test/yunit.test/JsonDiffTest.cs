@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 using System.Linq;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace Yunit
@@ -136,8 +136,8 @@ namespace Yunit
         private static void Run(string expected, string actual, string diff, JsonDiffBuilder builder)
         {
             var actualDiff = builder.Build().Diff(
-                    JToken.Parse(expected.Replace('\'', '\"')),
-                    JToken.Parse(actual.Replace('\'', '\"')));
+                    JsonNode.Parse(expected.Replace('\'', '\"')),
+                    JsonNode.Parse(actual.Replace('\'', '\"')));
 
             var actualChanges = actualDiff
                 .Replace("\r", "")

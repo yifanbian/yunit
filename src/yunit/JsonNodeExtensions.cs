@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+﻿// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
@@ -16,7 +16,8 @@ namespace Yunit
 
         internal static T Clone<T>(this T node, JsonSerializerOptions options = null) where T : JsonNode
         {
-            return JsonNode.Parse(node.ToJsonString(options)) as T;
+            // Temporary work-around of System.Text.Json not supporting deep clone
+            return node == null ? null : JsonNode.Parse(node.ToJsonString(options)) as T;
         }
     }
 }
